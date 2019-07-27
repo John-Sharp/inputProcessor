@@ -1,7 +1,7 @@
 #ifndef INPUT_PROCESSOR_H
 #define INPUT_PROCESSOR_H
 #include <SDL2/SDL.h>
-#include "../jTypes/jTypes.h"
+#include <jTypes.h>
 
 typedef juint GAME_STATE;
 enum

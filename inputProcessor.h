@@ -39,4 +39,16 @@ void activateState(GAME_STATE state);
 void deactivateState(GAME_STATE state);
 bool isStateActive(GAME_STATE state);
 
+typedef void (*mouseCallback)(jint x, jint y, void * owner); 
+typedef struct mouseCallbackBinding
+{
+    Uint32 type;
+    Uint8 button;
+    mouseCallback callback;
+    void * owner;
+} mouseCallbackBinding;
+
+bool addMouseCallback(const mouseCallbackBinding * binding);
+bool rmMouseCallback(const mouseCallbackBinding * binding);
+
 #endif

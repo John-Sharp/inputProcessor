@@ -4,10 +4,17 @@ bool activeStates[GS_NUM_STATES];
 keyStateBinding bindings[MAX_BINDINGS];
 juint numberOfBindings;
 
+#include "listHeaders/mouseCallbackBindingList.h"
+#include "listCode/mouseCallbackBindingList.inc"
+mouseCallbackBindingList * mouseCBList;
+
 void inputProcessorInit()
 {
     memset(activeStates, 0, GS_NUM_STATES); 
     numberOfBindings = 0;
+
+    mouseCBList = NULL;
+
     return;
 }
 
@@ -108,9 +115,9 @@ bool rm_binding(keyStateBinding *binding)
     return true;
 }
 
-void processEvent(SDL_Event *event)
+void processKeyboardEvent(SDL_KeyboardEvent *event)
 {
-    SDL_Keycode key = event->key.keysym.sym;
+    SDL_Keycode key = event->keysym.sym;
 
     keyStateBinding *b = searchBindingsByKey(key);
     keyStateBinding *bEnd = 
@@ -120,7 +127,7 @@ void processEvent(SDL_Event *event)
         return;
 
     while (b->k == key && b != bEnd) {
-        if (event->key.type == SDL_KEYDOWN) {
+        if (event->type == SDL_KEYDOWN) {
             if (b->t == BINDING_ATOMIC && isStateActive(b->s)) {
                 deactivateState(b->s);
                 b++;
@@ -131,9 +138,35 @@ void processEvent(SDL_Event *event)
             continue;
         }
 
-        if (event->key.type == SDL_KEYUP && b->t == BINDING_CONTINUOUS)
+        if (event->type == SDL_KEYUP && b->t == BINDING_CONTINUOUS)
             deactivateState(b->s);
         b++;
+    }
+}
+
+bool typeButtonCmp(const mouseCallbackBinding * a, const mouseCallbackBinding * b)
+{
+    if (a->type == b->type && a->button == b->button)
+        return true;
+    return false;
+}
+
+void processMouseButtonEvent(SDL_MouseButtonEvent *event)
+{
+    mouseCallbackBinding searchCandidate = {.type = event->type, .button = event->button};
+    mouseCallbackBindingList * searchList = mouseCBList;
+
+    while (searchList)
+    {
+        mouseCallbackBindingList * foundBinding = mouseCallbackBindingListSearch(
+                searchList, &searchCandidate, typeButtonCmp);
+
+        if (!foundBinding)
+            break;
+
+        // call the callback with its owner
+        foundBinding->val->callback(event->x, event->y, foundBinding->val->owner);
+        searchList = foundBinding->next;
     }
 }
 
@@ -142,10 +175,19 @@ void processInput()
     SDL_Event event;
 
     while (SDL_PollEvent(&event)) {
-        if (event.type == SDL_QUIT) {
-            activeStates[GS_QUIT] = true;
+        switch (event.type) {
+            case SDL_QUIT:
+                activeStates[GS_QUIT] = true;
+                break;
+            case SDL_KEYDOWN:
+            case SDL_KEYUP:
+                processKeyboardEvent(&event.key);
+                break;
+            case SDL_MOUSEBUTTONDOWN:
+            case SDL_MOUSEBUTTONUP:
+                processMouseButtonEvent(&event.button);
+                break;
         }
-        processEvent(&event);
     }
 }
 
@@ -162,4 +204,29 @@ void deactivateState(GAME_STATE state)
 bool isStateActive(GAME_STATE state)
 {
     return activeStates[state];
+}
+
+bool addMouseCallback(const mouseCallbackBinding * binding)
+{
+    mouseCallbackBinding * bindingCopy = malloc(sizeof(*bindingCopy));
+    if (!bindingCopy)
+    {
+        return false;
+    }
+    *bindingCopy = *binding;
+
+    mouseCBList = mouseCallbackBindingListAdd(mouseCBList, bindingCopy);
+    return true;
+}
+
+bool rmMouseCallback(const mouseCallbackBinding * binding)
+{
+    mouseCallbackBinding * bindingCopy;
+
+    mouseCBList = mouseCallbackBindingListRm(mouseCBList, binding, mouseCallbackBindingCmp, &bindingCopy);
+
+    if (bindingCopy)
+        free(bindingCopy);
+
+    return true;
 }
